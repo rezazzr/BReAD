@@ -4,7 +4,6 @@ version = "0.1.0"
 description = ""
 authors = ["Reza Davari <rezazzr@hotmail.com>"]
 readme = "README.md"
-packages = [{include = "prompt_migration_agent"}]
 
 [tool.poetry.dependencies]
 python = "^3.10"
@@ -12,7 +11,16 @@ numpy = "^2.2.2"
 matplotlib = "^3.10.0"
 seaborn = "^0.13.2"
 pandas = "^2.2.3"
+wandb = "^0.19.6"
+tqdm = "^4.67.1"
+jupyter-black = "^0.4.0"
+torch = "^2.7.1"
+torchvision = "^0.22.1"
+torchaudio = "^2.7.1"
 
+
+[tool.poetry.group.dev.dependencies]
+ipykernel = "^6.29.5"
 
 [build-system]
 requires = ["poetry-core"]

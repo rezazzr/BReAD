@@ -67,5 +67,3 @@ class CustomTask(BaseTask):
             return match[-1]
 
         return "N/A: format error."
-
-        return "N/A: format error."

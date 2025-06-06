@@ -2,10 +2,9 @@
 # https://arxiv.org/abs/2305.03495
 
 import re
-from typing import Optional, Tuple
+from typing import Tuple
 
 import numpy as np
-
 import wandb
 
 from ..utils import *
@@ -51,8 +50,6 @@ class GradientDescent:
             self.gradient_sampling % 1 == 0 and self.gradient_sampling >= 1
         ), "self.gradient_sampling must be an integer greater than or equal to 1."
 
-        self.use_correct_examples = False
-
         self.optimize_prompt_tempelate = (
             optimize_prompt_tempelate_single
             if num_new_prompts == 1
@@ -81,9 +78,10 @@ class GradientDescent:
         responses, loging_dict = self._batch_forward_func(batch_prompts)
         wandb.log({f"{key}_base_model": value for key, value in loging_dict.items()})
 
-        for p, r in zip(batch_prompts, responses):
-            self.logger.info(f"Input:\n{p}")
-            self.logger.info(f"Output:\n{r}")
+        if self.logger is not None:
+            for p, r in zip(batch_prompts, responses):
+                self.logger.info(f"Input:\n{p}")
+                self.logger.info(f"Output:\n{r}")
 
         preds = self.task.batch_clean_responses(responses)
 
@@ -120,7 +118,7 @@ class GradientDescent:
             "acc": acc,
         }
 
-        if self.print_log:
+        if self.print_log and self.logger is not None:
             log_str = forward_log_tempelate.format(
                 cur_prompt=cur_prompt,
                 batch_prompts=batch_prompts,
@@ -272,16 +270,16 @@ class GradientDescent:
             gradient_summary_prompt = self._get_gradient_summary_prompt(gradient_batch)
             gradient, _ = self.optim_model.generate(gradient_summary_prompt)
 
-            if self.print_log:
+            if self.print_log and self.logger is not None:
                 log_str = gradient_summary_template.format(
                     prompt=gradient_summary_prompt, summary=gradient
                 )
 
-            self.logger.info(log_str)
+                self.logger.info(log_str)
 
         wandb.log({f"{key}_optim_model": value for key, value in loging_dict.items()})
 
-        if self.print_log:
+        if self.print_log and self.logger is not None:
             log_str = gradient_log_tempelate.format(
                 gradient_prompt=gradient_prompt, gradient=gradient
             )
@@ -326,7 +324,7 @@ class GradientDescent:
         wandb.log({f"{key}_optim_model": value for key, value in loging_dict.items()})
 
         optimized_prompt = self._clean_optim_response(response)
-        if self.print_log:
+        if self.print_log and self.logger is not None:
             log_str = optimize_log_tempelate.format(
                 optimize_prompt=optimize_prompt,
                 response=response,
@@ -344,8 +342,8 @@ class GradientDescent:
             gradient_positive_prompt,
             gradient_negative_prompt,
         ) = ("", "", "", "")
-
-        self.logger.info(f"cur_prompt: {cur_prompt}")
+        if self.logger is not None:
+            self.logger.info(f"cur_prompt: {cur_prompt}")
 
         forward_output = self.forward(batch=batch, cur_prompt=cur_prompt)
         correct_np = np.array(forward_output["correct"])

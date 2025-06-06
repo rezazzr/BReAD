@@ -2,8 +2,10 @@ import ctranslate2
 import torch
 import transformers
 
+from .base_model import BaseLanguageModel
 
-class CTranslateModel:
+
+class CTranslateModel(BaseLanguageModel):
     def __init__(
         self,
         model_name: str,
@@ -15,10 +17,9 @@ class CTranslateModel:
         device: str = "cuda" if torch.cuda.is_available() else "cpu",
         **kwargs
     ):
+        super().__init__(model_name, temperature, **kwargs)
 
-        self.model_name = model_name
         self.device = device
-        self.temperature = temperature
         self.max_length = max_length
         self.tokenizer = transformers.AutoTokenizer.from_pretrained(
             model_name, trust_remote_code=True, truncate=True, padding=True
@@ -28,14 +29,14 @@ class CTranslateModel:
     def batch_forward_func(self, batch_prompts):
         responses = []
         for prompt in batch_prompts:
-            responses.append(self.generate(prompt=prompt))
+            responses.append(self.generate(input=prompt))
         return responses
 
-    def generate(self, prompt):
-        tokens = self.tokenizer.convert_ids_to_tokens(self.tokenizer.encode(prompt))
+    def generate(self, input):
+        tokens = self.tokenizer.convert_ids_to_tokens(self.tokenizer.encode(input))
         results = self.model.generate_batch(
             [tokens],
-            sampling_temperature=0,
+            sampling_temperature=self.temperature,
             max_length=self.max_length,
             include_prompt_in_result=False,
         )

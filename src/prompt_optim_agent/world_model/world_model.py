@@ -1,8 +1,10 @@
 from typing import Generic, List
 
+import wandb
 from tqdm import tqdm
 
-import wandb
+from src.prompt_optim_agent.language_model.base_model import BaseLanguageModel
+from src.tasks.base_task import BaseTask
 
 from ..search_algo.base_algo import Action, State
 from ..search_algo.mcts import MCTSNode
@@ -12,9 +14,9 @@ from .gradient_descent import *
 class WorldModel(Generic[State, Action]):
     def __init__(
         self,
-        task,
+        task: BaseTask,
         logger,
-        base_model,
+        base_model: BaseLanguageModel,
         optim_model,
         num_new_prompts=1,
         train_shuffle=True,
@@ -267,4 +269,5 @@ class WorldModel(Generic[State, Action]):
         if isinstance(metric, tuple):
             return metric[0]
         else:
+            return metric
             return metric

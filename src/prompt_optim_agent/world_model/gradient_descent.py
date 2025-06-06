@@ -50,20 +50,17 @@ class GradientDescent:
             self.gradient_sampling % 1 == 0 and self.gradient_sampling >= 1
         ), "self.gradient_sampling must be an integer greater than or equal to 1."
 
-        self.optimize_prompt_tempelate = (
-            optimize_prompt_tempelate_single
-            if num_new_prompts == 1
-            else optimize_prompt_tempelate
+        def _select_template(single, multi):
+            return single if num_new_prompts == 1 else multi
+
+        self.optimize_prompt_tempelate = _select_template(
+            optimize_prompt_tempelate_single, optimize_prompt_tempelate
         )
-        self.ascend_optimize_prompt_tempelate = (
-            ascend_optimize_prompt_tempelate_single
-            if num_new_prompts == 1
-            else ascend_optimize_prompt_tempelate
+        self.ascend_optimize_prompt_tempelate = _select_template(
+            ascend_optimize_prompt_tempelate_single, ascend_optimize_prompt_tempelate
         )
-        self.mix_optimize_prompt_tempelate = (
-            mix_optmize_prompt_tempelate_single
-            if num_new_prompts == 1
-            else mix_optmize_prompt_tempelate
+        self.mix_optimize_prompt_tempelate = _select_template(
+            mix_optmize_prompt_tempelate_single, mix_optmize_prompt_tempelate
         )
         self.gradient_prompt_tempelate = gradient_prompt_tempelate
         self.ascend_gradient_prompt_template = ascend_gradient_prompt_tempelate
@@ -75,8 +72,8 @@ class GradientDescent:
     def forward(self, batch, cur_prompt):
         batch_size = len(batch["question"])
         batch_prompts = self._build_forward_prompts_func(batch["question"], cur_prompt)
-        responses, loging_dict = self._batch_forward_func(batch_prompts)
-        wandb.log({f"{key}_base_model": value for key, value in loging_dict.items()})
+        responses, logging_dict = self._batch_forward_func(batch_prompts)
+        wandb.log({f"{key}_base_model": value for key, value in logging_dict.items()})
 
         if self.logger is not None:
             for p, r in zip(batch_prompts, responses):
@@ -261,10 +258,10 @@ class GradientDescent:
         )
 
         if nb_gradient_samples == 1:
-            gradient, loging_dict = self.optim_model.generate(gradient_prompt)
+            gradient, logging_dict = self.optim_model.generate(gradient_prompt)
         else:
             gradient_prompt_batch = [gradient_prompt] * nb_gradient_samples
-            gradient_batch, loging_dict = self.optim_model.batch_forward_func(
+            gradient_batch, logging_dict = self.optim_model.batch_forward_func(
                 gradient_prompt_batch
             )
             gradient_summary_prompt = self._get_gradient_summary_prompt(gradient_batch)
@@ -277,7 +274,7 @@ class GradientDescent:
 
                 self.logger.info(log_str)
 
-        wandb.log({f"{key}_optim_model": value for key, value in loging_dict.items()})
+        wandb.log({f"{key}_optim_model": value for key, value in logging_dict.items()})
 
         if self.print_log and self.logger is not None:
             log_str = gradient_log_tempelate.format(
@@ -320,8 +317,8 @@ class GradientDescent:
             steps_per_gradient=steps_per_gradient,
         )
 
-        response, loging_dict = self.optim_model.generate(optimize_prompt)
-        wandb.log({f"{key}_optim_model": value for key, value in loging_dict.items()})
+        response, logging_dict = self.optim_model.generate(optimize_prompt)
+        wandb.log({f"{key}_optim_model": value for key, value in logging_dict.items()})
 
         optimized_prompt = self._clean_optim_response(response)
         if self.print_log and self.logger is not None:

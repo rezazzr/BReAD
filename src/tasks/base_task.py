@@ -4,7 +4,7 @@ import os
 import random
 import re
 import string
-from typing import Dict, List
+from typing import Dict, List, Optional
 
 import numpy as np
 from torch.utils.data import DataLoader, Dataset
@@ -26,10 +26,10 @@ class BaseTask:
         self,
         train_size,
         eval_size,
-        test_size=None,
+        test_size: int = 0,
         task_name="base_task",
-        data_dir=None,
-        seed=None,
+        data_dir: str = "",
+        seed: Optional[int] = None,
         post_instruction=False,
         TaskDataset=BaseDataset,
         option_num=5,
@@ -65,8 +65,8 @@ class BaseTask:
 
         """
         self.task_name: str = task_name
-        self.data_dir: str = data_dir
-        self.seed: int = seed
+        self.data_dir = data_dir
+        self.seed = seed
         self.train_size = train_size
         self.test_size = test_size
         self.eval_size = eval_size
@@ -136,7 +136,7 @@ class BaseTask:
         """
         return dataset
 
-    def cal_correct(self, preds, labels, data_type="str", **kwargs):
+    def cal_correct(self, preds, labels, data_type="str", **kwargs) -> List[int]:
         """
         <task specific>
         The function of comparing the predictions and labels.
@@ -157,9 +157,7 @@ class BaseTask:
                     comparisons.append(1)
                 else:
                     comparisons.append(0)
-                return (
-                    comparisons  # I think this is a bug and should be outside the loop
-                )
+            return comparisons  # I think this is a bug and should be outside the loop
         else:
             return list(np.array((np.array(preds) == np.array(labels))).astype(int))
 
@@ -340,7 +338,7 @@ class BaseTask:
             data = json.load(file)
         return data
 
-    def build_task_dataset(self, dataset, TaskDataset=None):
+    def build_task_dataset(self, dataset, TaskDataset):
         return TaskDataset(dataset=dataset)
 
     def get_dataloader(

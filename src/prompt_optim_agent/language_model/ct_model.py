@@ -1,6 +1,6 @@
 import ctranslate2
-import transformers
 import torch
+import transformers
 
 
 class CTranslateModel:

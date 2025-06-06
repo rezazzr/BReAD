@@ -1,5 +1,9 @@
-from openai import OpenAI
 import time
+
+from openai import OpenAI
+from openai.types.chat import ChatCompletionUserMessageParam
+
+from .base_model import BaseLanguageModel
 
 CHAT_COMPLETION_MODELS = [
     "gpt-4o",
@@ -11,8 +15,9 @@ CHAT_COMPLETION_MODELS = [
 ]
 
 
-class OpenAIModel:
+class OpenAIModel(BaseLanguageModel):
     def __init__(self, model_name: str, api_key: str, temperature: float, **kwargs):
+        super().__init__(model_name, temperature, **kwargs)
 
         if api_key is None:
             raise ValueError(f"api_key error: {api_key}")
@@ -21,9 +26,6 @@ class OpenAIModel:
         except Exception as e:
             print(f"Init openai client error: \n{e}")
             raise RuntimeError("Failed to initialize OpenAI client") from e
-
-        self.model_name = model_name
-        self.temperature = temperature
 
         if model_name in CHAT_COMPLETION_MODELS:
             self.batch_forward_func = self.batch_forward_chatcompletion
@@ -37,13 +39,14 @@ class OpenAIModel:
         """
         responses = []
         for prompt in batch_prompts:
-            response = self.gpt_chat_completion(prompt=prompt)
+            response = self.gpt_chat_completion(input=prompt)
             responses.append(response)
         return responses
 
-    def gpt_chat_completion(self, prompt):
+    def gpt_chat_completion(self, input):
+
         messages = [
-            {"role": "user", "content": prompt},
+            ChatCompletionUserMessageParam(role="user", content=input),
         ]
         backoff_time = 1
         while True:
@@ -55,9 +58,12 @@ class OpenAIModel:
                         temperature=self.temperature,
                     )
                     .choices[0]
-                    .message.content.strip()
+                    .message.content.strip()  # type: ignore
                 )
             except Exception as e:
                 print(e, f" Sleeping {backoff_time} seconds...")
                 time.sleep(backoff_time)
+                backoff_time *= 1.5
+                time.sleep(backoff_time)
+                backoff_time *= 1.5
                 backoff_time *= 1.5

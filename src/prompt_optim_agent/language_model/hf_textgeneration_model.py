@@ -1,8 +1,10 @@
-from transformers import AutoModelForCausalLM, AutoTokenizer
 import torch
+from transformers import AutoModelForCausalLM, AutoTokenizer
+
+from .base_model import BaseLanguageModel
 
 
-class HFTextGenerationModel:
+class HFTextGenerationModel(BaseLanguageModel):
     def __init__(
         self,
         model_name: str,
@@ -10,10 +12,9 @@ class HFTextGenerationModel:
         device: str = "cuda:1" if torch.cuda.is_available() else "cpu",
         **kwargs
     ):
+        super().__init__(model_name, temperature, **kwargs)
 
-        self.model_name = model_name
         self.device = device
-        self.temperature = temperature
         self.do_sample = True if temperature != 0 else False
         self.tokenizer = AutoTokenizer.from_pretrained(
             model_name, trust_remote_code=True, truncate=True, padding=True

@@ -1,8 +1,10 @@
-from transformers import AutoModelForSeq2SeqLM, AutoTokenizer
 import torch
+from transformers import AutoModelForSeq2SeqLM, AutoTokenizer
+
+from .base_model import BaseLanguageModel
 
 
-class HFText2TextModel:
+class HFText2TextModel(BaseLanguageModel):
     def __init__(
         self,
         model_name: str,
@@ -10,9 +12,8 @@ class HFText2TextModel:
         device: str = "cuda" if torch.cuda.is_available() else "cpu",
         **kwargs
     ):
+        super().__init__(model_name, temperature, **kwargs)
 
-        self.model_name = model_name
-        self.temperature = temperature
         self.device = device
         self.do_sample = True if temperature != 0 else False
         self.tokenizer = AutoTokenizer.from_pretrained(

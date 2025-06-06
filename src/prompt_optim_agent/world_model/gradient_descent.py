@@ -224,11 +224,11 @@ class GradientDescent:
         return error_string, correct_string
 
     def _build_prompt_trajectory_str(self, prompts):
-        prompt_path_str = ""
         prompt_path_str_tempelate = "({index}) {prompt}\n"
-        for i, prompt in enumerate(prompts):
-            prompt_path_str += prompt_path_str_tempelate.format(index=i, prompt=prompt)
-        return prompt_path_str
+        return "".join(
+            prompt_path_str_tempelate.format(index=i, prompt=prompt)
+            for i, prompt in enumerate(prompts)
+        )
 
     def _get_gradient_summary_prompt(self, batch_gradient):
         feedbacks = "<feedbacks>\n"
@@ -288,9 +288,7 @@ class GradientDescent:
     def _clean_optim_response(self, optim_response):
         pattern = r"<START>(.*?)<END>"
         matches = re.findall(pattern=pattern, string=optim_response, flags=re.DOTALL)
-        for i, m in enumerate(matches):
-            matches[i] = m.strip()
-        return matches
+        return [m.strip() for m in matches]
 
     def optimize(
         self,
@@ -408,47 +406,41 @@ class GradientDescent:
         )
 
         gradient_descent_output = forward_output
-        gradient_descent_output[
-            "example_string"
-        ] = """
-        <error examples>
-        {error_string}
-        </error examples>
-        <correct examples>
-        {correct_string}
-        </correct examples>""".strip().format(
-            error_string=error_string, correct_string=correct_string
+        gradient_descent_output["example_string"] = self._format_tagged_output(
+            [("error examples", error_string), ("correct examples", correct_string)]
         )
-        gradient_descent_output[
-            "gradient"
-        ] = """
-        <positive gradient>
-        {gradient_positive}
-        </positive gradient>
-        <negative gradient>
-        {gradient_negative}
-        </negative gradient>
-        """.strip().format(
-            gradient_positive=gradient_positive, gradient_negative=gradient_negative
+
+        gradient_descent_output["gradient"] = self._format_tagged_output(
+            [
+                ("positive gradient", gradient_positive),
+                ("negative gradient", gradient_negative),
+            ]
         )
-        gradient_descent_output[
-            "gradient_prompt"
-        ] = """
-        <positive gradient prompt>
-        {gradient_positive_prompt}
-        </positive gradient prompt>
-        <negative gradient prompt>
-        {gradient_negative_prompt}
-        </negative gradient prompt>
-        """.strip().format(
-            gradient_positive_prompt=gradient_positive_prompt,
-            gradient_negative_prompt=gradient_negative_prompt,
+        gradient_descent_output["gradient_prompt"] = self._format_tagged_output(
+            [
+                ("positive gradient prompt", gradient_positive_prompt),
+                ("negative gradient prompt", gradient_negative_prompt),
+            ]
         )
         gradient_descent_output["optimized_prompts"] = optimized_prompts
         return gradient_descent_output
 
+    def _format_tagged_output(self, tag_value_pairs):
+        """
+        Create a formatted string with values wrapped in XML-style tags.
+
+        Args:
+            tag_value_pairs: A list of (tag_name, value) tuples
+
+        Returns:
+            A formatted string with all values wrapped in their respective tags
+        """
+
+        return "\n".join(
+            [f"<{tag}>\n{value}\n</{tag}>" for tag, value in tag_value_pairs]
+        ).strip()
+
     def __call__(self, batch, cur_prompt: str, helper_data=None, depth=None):
-        gradient_descent_output = self.gradient_descent_step(
+        return self.gradient_descent_step(
             cur_prompt=cur_prompt, batch=batch, helper_data=helper_data, depth=depth
         )
-        return gradient_descent_output

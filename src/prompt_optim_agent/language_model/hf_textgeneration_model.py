@@ -1,4 +1,5 @@
-import torch
+from typing import Optional
+
 from transformers import AutoModelForCausalLM, AutoTokenizer
 
 from .base_model import BaseLanguageModel
@@ -9,15 +10,14 @@ class HFTextGenerationModel(BaseLanguageModel):
         self,
         model_name: str,
         temperature: float,
-        device: str = "cuda:1" if torch.cuda.is_available() else "cpu",
+        device: Optional[str] = None,
         **kwargs
     ):
         super().__init__(model_name, temperature, **kwargs)
 
-        self.device = device
-        self.do_sample = True if temperature != 0 else False
+        self.device = device or self.get_default_device()
         self.tokenizer = AutoTokenizer.from_pretrained(
-            model_name, trust_remote_code=True, truncate=True, padding=True
+            model_name, **self.get_tokenizer_kwargs()
         )
         self.model = AutoModelForCausalLM.from_pretrained(
             model_name, trust_remote_code=True
@@ -29,7 +29,7 @@ class HFTextGenerationModel(BaseLanguageModel):
         ).to(self.device)
         model_output = self.model.generate(
             **model_inputs,
-            do_sample=self.do_sample,
+            do_sample=self.should_sample,
             temperature=self.temperature,
             max_new_tokens=1024,
             repetition_penalty=1.2,
@@ -52,7 +52,7 @@ class HFTextGenerationModel(BaseLanguageModel):
         ).to(self.device)
         model_output = self.model.generate(
             **model_inputs,
-            do_sample=self.do_sample,
+            do_sample=self.should_sample,
             temperature=self.temperature,
             max_new_tokens=2048,
             repetition_penalty=1.2,
@@ -67,4 +67,4 @@ class HFTextGenerationModel(BaseLanguageModel):
 
         if response == "" or response is None:
             return ""
-        return response[0]
+        return response

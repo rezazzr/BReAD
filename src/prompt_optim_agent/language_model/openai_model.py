@@ -19,6 +19,10 @@ class OpenAIModel(BaseLanguageModel):
     def __init__(self, model_name: str, api_key: str, temperature: float, **kwargs):
         super().__init__(model_name, temperature, **kwargs)
 
+        assert (
+            model_name in CHAT_COMPLETION_MODELS
+        ), f"Model {model_name} not supported."
+
         if api_key is None:
             raise ValueError(f"api_key error: {api_key}")
         try:
@@ -27,23 +31,11 @@ class OpenAIModel(BaseLanguageModel):
             print(f"Init openai client error: \n{e}")
             raise RuntimeError("Failed to initialize OpenAI client") from e
 
-        if model_name in CHAT_COMPLETION_MODELS:
-            self.batch_forward_func = self.batch_forward_chatcompletion
-            self.generate = self.gpt_chat_completion
-        else:
-            raise ValueError(f"Model {model_name} not supported.")
+    def batch_forward_func(self, batch_prompts):
+        """Use base class default implementation."""
+        return self.default_batch_forward_func(batch_prompts)
 
-    def batch_forward_chatcompletion(self, batch_prompts):
-        """
-        Input a batch of prompts to openai chat API and retrieve the answers.
-        """
-        responses = []
-        for prompt in batch_prompts:
-            response = self.gpt_chat_completion(input=prompt)
-            responses.append(response)
-        return responses
-
-    def gpt_chat_completion(self, input):
+    def generate(self, input):
 
         messages = [
             ChatCompletionUserMessageParam(role="user", content=input),
@@ -63,7 +55,4 @@ class OpenAIModel(BaseLanguageModel):
             except Exception as e:
                 print(e, f" Sleeping {backoff_time} seconds...")
                 time.sleep(backoff_time)
-                backoff_time *= 1.5
-                time.sleep(backoff_time)
-                backoff_time *= 1.5
                 backoff_time *= 1.5

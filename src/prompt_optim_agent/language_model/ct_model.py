@@ -1,5 +1,6 @@
+from typing import Optional
+
 import ctranslate2
-import torch
 import transformers
 
 from .base_model import BaseLanguageModel
@@ -14,23 +15,20 @@ class CTranslateModel(BaseLanguageModel):
         # your downloaded ct model path, e.g. "./workspace/download_models/Mistral-7B-Instruct-v0.2_int8_float16"
         temperature: float = 0,
         max_length: int = 512,
-        device: str = "cuda" if torch.cuda.is_available() else "cpu",
+        device: Optional[str] = None,
         **kwargs
     ):
         super().__init__(model_name, temperature, **kwargs)
 
-        self.device = device
+        self.device = device or self.get_default_device()
         self.max_length = max_length
         self.tokenizer = transformers.AutoTokenizer.from_pretrained(
-            model_name, trust_remote_code=True, truncate=True, padding=True
+            model_name, **self.get_tokenizer_kwargs()
         )
         self.model = ctranslate2.Generator(model_path, device=device)
 
     def batch_forward_func(self, batch_prompts):
-        responses = []
-        for prompt in batch_prompts:
-            responses.append(self.generate(input=prompt))
-        return responses
+        return self.default_batch_forward_func(batch_prompts)
 
     def generate(self, input):
         tokens = self.tokenizer.convert_ids_to_tokens(self.tokenizer.encode(input))

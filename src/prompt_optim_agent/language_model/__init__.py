@@ -6,11 +6,9 @@ from .openai_model import OpenAIModel
 
 LANGUAGE_MODELS = {
     "openai": OpenAIModel,
-    "palm": PaLMModel,
     "hf_text2text": HFText2TextModel,
     "hf_textgeneration": HFTextGenerationModel,
     "ct_model": CTranslateModel,
-    "microsoft": MSFTSubstrate,
 }
 
 

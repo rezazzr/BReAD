@@ -1,10 +1,8 @@
 from . import *
-from .openai_model import OpenAIModel
-from .palm_model import PaLMModel
+from .ct_model import CTranslateModel
 from .hf_text2text_model import HFText2TextModel
 from .hf_textgeneration_model import HFTextGenerationModel
-from .ct_model import CTranslateModel
-from .microsoft_substrate import MSFTSubstrate
+from .openai_model import OpenAIModel
 
 LANGUAGE_MODELS = {
     "openai": OpenAIModel,

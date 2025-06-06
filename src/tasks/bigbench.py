@@ -1,7 +1,8 @@
 # define task prompts for various datasets
-from .base_task import BaseDataset, BaseTask
 import re
 import string
+
+from .base_task import BaseDataset, BaseTask
 
 
 class CustomTask(BaseTask):
@@ -9,7 +10,7 @@ class CustomTask(BaseTask):
         self,
         train_size,
         eval_size,
-        test_size=None,
+        test_size=0,
         task_name="bigbench",
         task_description="task from bigbench",
         data_dir="",

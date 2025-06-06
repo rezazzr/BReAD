@@ -1,8 +1,10 @@
 # define task prompts for various datasets
 import re
-from datasets import load_dataset
-from .base_task import BaseTask
 import string
+
+from datasets import load_dataset
+
+from .base_task import BaseTask
 
 
 class CustomTask(BaseTask):
@@ -10,7 +12,7 @@ class CustomTask(BaseTask):
         self,
         train_size,
         eval_size,
-        test_size=None,
+        test_size=0,
         task_name="med_qa",
         task_discription="domain",
         seed=None,
@@ -108,5 +110,7 @@ class CustomTask(BaseTask):
             return answer.group(0)[1].upper()
         answer = re.search(r"[" + letters + r"]", match[-1])
         if answer is None:
+            return "N/A: Format error"
+        return answer[0].upper()
             return "N/A: Format error"
         return answer[0].upper()

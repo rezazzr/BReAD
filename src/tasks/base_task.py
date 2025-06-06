@@ -4,359 +4,289 @@ import os
 import random
 import re
 import string
-from typing import Dict, List, Optional
+from dataclasses import dataclass
+from typing import Any, Dict, List, Optional, Tuple, Union
 
 import numpy as np
 from torch.utils.data import DataLoader, Dataset
 
 
+@dataclass
+class SplitConfig:
+    """Configuration for dataset splitting."""
+
+    train_size: Optional[int] = None
+    eval_size: int = 150
+    test_size: int = 0
+    seed: Optional[int] = None
+    base_shuffle: bool = True
+
+
 class BaseDataset(Dataset):
-    def __init__(self, dataset):
+    """Base dataset class for wrapping data."""
+
+    def __init__(self, dataset: List[Dict[str, Any]]):
         self.dataset = dataset
 
-    def __len__(self):
+    def __len__(self) -> int:
         return len(self.dataset)
 
-    def __getitem__(self, index):
+    def __getitem__(self, index: int) -> Dict[str, Any]:
         return self.dataset[index]
 
 
 class BaseTask:
+    """Base class for various machine learning tasks."""
+
     def __init__(
         self,
-        train_size,
-        eval_size,
+        train_size: Optional[int],
+        eval_size: int,
         test_size: int = 0,
-        task_name="base_task",
+        task_name: str = "base_task",
         data_dir: str = "",
         seed: Optional[int] = None,
-        post_instruction=False,
-        TaskDataset=BaseDataset,
-        option_num=5,
+        post_instruction: bool = False,
+        TaskDataset: type = BaseDataset,
+        option_num: int = 5,
         **kwargs,
     ):
-        """
-        Base class for each tasks.
-
-        args:
-            option_num: max number of options in the task
-            post_instruction: True: answer + prompt | False: prompt + answer
-            data_dir: dir of task data's json file
-
-        The BaseTask is designed for direct asnwer matching tasks,
-        single choice selection tasks, multi-choice selection tasks.
-
-        If requiring new tasks form, or different selection tasks,
-        several parts need to be implemented:
-
-            function: cal_correct
-            function: cal_metric
-            function: clean_labels
-            function: clean_response
-            property: self.answer_format_prompt
-            property: option_num
-            function: build_forward_prompts_completion (optional)
-
-        These two need to be implemented if your data is not organised
-        as the requirement of load_task_dataset
-            function: transform_format (optional)
-            function: load_task_dataset (optional)
-
-
-        """
-        self.task_name: str = task_name
+        """Initialize BaseTask with dataset loading and splitting."""
+        self.task_name = task_name
         self.data_dir = data_dir
         self.seed = seed
-        self.train_size = train_size
-        self.test_size = test_size
-        self.eval_size = eval_size
         self.post_instruction = post_instruction
         self.TaskDataset = TaskDataset
         self.option_num = option_num
-
-        origin_dataset = self.load_task_dataset(data_dir=data_dir)
-        origin_dataset = self.transform_format(origin_dataset)
-        self.dataset = self.get_split_task_dataset(
-            origin_dataset=origin_dataset,
-            seed=seed,
-            train_size=train_size,
-            eval_size=eval_size,
-            test_size=test_size,
-            base_shuffle=True,
-        )
-        self.train_size = len(self.dataset["train"])
-        self.eval_size = len(self.dataset["eval"])
-        self.test_size = len(self.dataset["test"])
-        print(f"train_size set: {self.train_size}")
-        print(f"eval_size set: {self.eval_size}")
-        print(f"test_size set: {self.test_size}")
-
         self.answer_format_prompt = "At the end show the answer option bracketed between <answer> and </answer>."
-        """
-            answer_format_prompt: 
-                It is appended after the task question to help the model extract the prediction.
-                It should match your prediction extraction method in function "clean_response".
-        """
+
+        # Load and process dataset in one pipeline
+        self.dataset = self._load_and_split_dataset(
+            SplitConfig(train_size, eval_size, test_size, seed)
+        )
+
+        # Update sizes and print info
+        self._update_and_print_sizes()
+
+    def _load_and_split_dataset(self, config: SplitConfig) -> Dict[str, List[Dict]]:
+        """Load and split dataset in one pipeline."""
+        origin_dataset = self.load_task_dataset(self.data_dir)
+        transformed_dataset = self.transform_format(origin_dataset)
+        return self.get_split_task_dataset(transformed_dataset, config)
+
+    def _update_and_print_sizes(self):
+        """Update instance sizes and print information."""
+        sizes = {split: len(data) for split, data in self.dataset.items()}
+        self.train_size, self.eval_size, self.test_size = sizes.values()
+        print(
+            f"Dataset sizes - train: {self.train_size}, eval: {self.eval_size}, test: {self.test_size}"
+        )
 
     def load_task_dataset(self, data_dir: str) -> List[Dict[str, str]]:
-        """
-        <Task Specific>
-        This is a default function for loading task dataset from json files. It can be re-implemented in the task.py files.
+        """Load task dataset from json files."""
+        if not data_dir:
+            raise ValueError("data_dir cannot be empty")
 
-        The output dataset can be either a list of question answer pairs or a dict with a default train-test split:
-            all examples:
-                [{'question':question, 'answer':answer}]
-            or
-            default split:
-                {'train':[{'question':question, 'answer':answer}], 'test':[{'question':question, 'answer':answer}]}
-        """
         dataset = self._load_json_file(data_dir)
-
-        examples = [
-            {"question": example["question"], "answer": example["answer"]}
-            for example in dataset["examples"]
+        return [
+            {"question": ex["question"], "answer": ex["answer"]}
+            for ex in dataset["examples"]
         ]
 
-        return examples
-
     def transform_format(self, dataset: List[Dict[str, str]]) -> List[Dict[str, str]]:
-        """
-        <task specific>
-        This function is to transform the dataset question's format for
-        a better input form for the base_model.
-        For example, for each data point:
-        "question": Who is better?
-        transform_format
-        -> Who is better? Options: A. Allen B.Jack
-
-        It can be re-implemented in the task.py files.
-
-        Do nothing if your "question" in the dataset can be directly fed to
-        the base_model to make predictions.
-        """
+        """Transform dataset format (override in subclasses if needed)."""
         return dataset
 
-    def cal_correct(self, preds, labels, data_type="str", **kwargs) -> List[int]:
-        """
-        <task specific>
-        The function of comparing the predictions and labels.
+    def cal_correct(
+        self, preds: List[Any], labels: List[Any], data_type: str = "str", **kwargs
+    ) -> List[int]:
+        """Compare predictions and labels efficiently."""
+        if len(preds) != len(labels):
+            raise ValueError(
+                f"Length mismatch: preds={len(preds)}, labels={len(labels)}"
+            )
 
-        data_type: str | set
-            str: preds, labels are List(str)
-            set: preds, labels are List(set)
+        return (
+            [1 if pred == label else 0 for pred, label in zip(preds, labels)]
+            if data_type == "set"
+            else list(np.equal(preds, labels).astype(int))
+        )
 
-        Every time a batch data is sampled and predicted, by comparing with
-        the labels, PromptAgent collect the errors.
-        Function called at: prompt_optim_agent/world_model/gradient_descent.py line 54
+    def cal_metric(self, preds: List[Any], labels: List[Any], **kwargs) -> float:
+        """Calculate accuracy metric."""
+        return np.mean(self.cal_correct(preds, labels)).item()
 
-        """
-        if data_type == "set":
-            comparisons = []
-            for p, l in zip(preds, labels):
-                if p == l:
-                    comparisons.append(1)
-                else:
-                    comparisons.append(0)
-            return comparisons
-        else:
-            return list(np.array((np.array(preds) == np.array(labels))).astype(int))
+    def cal_metric_from_cal_correct_output(
+        self, cal_correct_output: List[int]
+    ) -> float:
+        """Calculate metric from cal_correct output."""
+        return np.mean(cal_correct_output).item()
 
-    def cal_metric(self, preds, labels, questions=None, **kwargs):
-        """
-        <task specific>
-        Calculate the evaluation metric, e.g. Accuracy, F1 score.
-        "question" is for NCBI calculating F1 score.
-        return a number / tuple of metrics
-
-        This function is for calculating the reward of MCTS.
-        """
-        correct = self.cal_correct(preds=preds, labels=labels)
-        return np.mean(correct)
-
-    def cal_metric_from_cal_correct_output(self, cal_correct_output):
-        return np.mean(cal_correct_output)
-
-    def clean_labels(self, labels):
-        """
-        <task specific>
-        Transfer the form of the task ground-truth answers to List(set)
-        or List(str) that fit the input requirement of function "cal_correct"
-
-        Do nothing if the data is alreadly loaded that way.
-        """
+    def clean_labels(self, labels: List[Any]) -> List[Any]:
+        """Clean labels (override in subclasses if needed)."""
         return labels
 
-    def clean_response(self, response: str):
-        """
-        <task specific>
-        Extract the prediction from base_model's response,
-        so that the output form batch_clean_responses fit
-        the input requirement of function "cal_correct"
-        """
+    def clean_response(self, response: str) -> str:
+        """Extract prediction from model response with compact logic."""
+        if not response:
+            return "N/A: Empty response"
+
         letters = (
             string.ascii_uppercase[: self.option_num]
             + string.ascii_lowercase[: self.option_num]
         )
-        clean_pattern = r"<answer>([\s\S]*?)<\/answer>"
-        match = re.findall(clean_pattern, response.lower())
-        if len(match) == 0:
+
+        # Extract answer from <answer> tags
+        matches = re.findall(r"<answer>([\s\S]*?)<\/answer>", response.lower())
+        if not matches:
             return "N/A: Format error"
 
-        answer = re.search(r"\([" + letters + r"]\)", match[-1])
-        if answer is not None:
-            return answer.group(0)[1].upper()
-        answer = re.search(r"[" + letters + r"]", match[-1])
-        if answer is None:
-            return "N/A: Format error"
-        return answer[0].upper()
+        # Try to find answer in parentheses first, then standalone
+        answer_text = matches[-1]
+        for pattern in [rf"\([{letters}]\)", rf"[{letters}]"]:
+            match = re.search(pattern, answer_text)
+            if match:
+                return (
+                    match.group(0)[1].upper()
+                    if pattern.startswith(r"\(")
+                    else match.group(0).upper()
+                )
 
-    def batch_clean_responses(self, responses):
-        """
-        Extract preds from responses.
-        """
-        if not isinstance(responses, list):
-            responses = list(responses)
-        batch_answers = [self.clean_response(response) for response in responses]
-        return batch_answers
+        return "N/A: Format error"
 
-    def build_forward_prompts_completion(self, questions: List[str], cur_propmt: str):
-        """
-        Optional: <task specific>
-        The format of combining question and prompts.
-        """
-        prompts = [
-            (
-                f"{question}\n{cur_propmt}"
-                if self.post_instruction
-                else f"{cur_propmt}\n{question}\n{self.answer_format_prompt}"
-            )
-            for question in questions
+    def batch_clean_responses(self, responses: Union[List[str], Any]) -> List[str]:
+        """Extract predictions from batch responses."""
+        return [
+            self.clean_response(resp)
+            for resp in (responses if isinstance(responses, list) else list(responses))
         ]
 
-        return prompts
+    def build_forward_prompts_completion(
+        self, questions: List[str], cur_prompt: str
+    ) -> List[str]:
+        """Build prompts by combining questions and current prompt."""
+        template = "{}\n{}" if self.post_instruction else "{}\n{}\n{}"
+        return [
+            (
+                template.format(q, cur_prompt)
+                if self.post_instruction
+                else template.format(cur_prompt, q, self.answer_format_prompt)
+            )
+            for q in questions
+        ]
 
     def get_split_task_dataset(
-        self,
-        origin_dataset,
-        train_size=None,
-        eval_size=150,
-        test_size=0,
-        seed=None,
-        base_shuffle=True,
-    ):
-        """
-        Split the dataset into training set, eval set and testing set.
-        Support either a list of question answer pairs or a dict with a default train-test split.
-        train_set and eval_set may have overlap.
-        """
-        if isinstance(origin_dataset, dict):
-            train_set, eval_set, test_set = self.split_dict_dataset(
-                origin_dataset,
-                seed=seed,
-                train_size=train_size,
-                eval_size=eval_size,
-                test_size=test_size,
-                base_shuffle=base_shuffle,
-            )
-        elif isinstance(origin_dataset, list):
-            train_set, eval_set, test_set = self.split_list_dataset(
-                origin_dataset,
-                seed=seed,
-                train_size=train_size,
-                eval_size=eval_size,
-                test_size=test_size,
-                base_shuffle=base_shuffle,
-            )
-        else:
-            raise ValueError(f"Dataset type {type(origin_dataset)} is not supported.")
+        self, origin_dataset: Union[List[Dict], Dict], config: SplitConfig
+    ) -> Dict[str, List[Dict]]:
+        """Split dataset using configuration object."""
+        splitter = self._get_dataset_splitter(origin_dataset)
+        train_set, eval_set, test_set = splitter(origin_dataset, config)  # type: ignore
+        return {"train": train_set, "eval": eval_set, "test": test_set}
 
-        dataset = dict(train=train_set, eval=eval_set, test=test_set)
+    def _get_dataset_splitter(self, dataset):
+        """Get appropriate splitter function based on dataset type."""
+        if isinstance(dataset, dict):
+            return self._split_dict_dataset
+        elif isinstance(dataset, list):
+            return self._split_list_dataset
+        else:
+            raise ValueError(f"Unsupported dataset type: {type(dataset)}")
+
+    def _shuffle_if_needed(
+        self, dataset: List[Dict], config: SplitConfig
+    ) -> List[Dict]:
+        """Shuffle dataset if needed based on configuration."""
+        if config.base_shuffle and config.seed is not None:
+            print(f"shuffle dataset seed {config.seed}")
+            random.seed(config.seed)
+            random.shuffle(dataset)
         return dataset
 
-    def split_dict_dataset(
-        self,
-        dataset,
-        train_size=None,
-        eval_size=0,
-        test_size=0,
-        seed=None,
-        base_shuffle=True,
-    ):
-        train_set = dataset["train"]
+    def _split_dict_dataset(
+        self, dataset: Dict, config: SplitConfig
+    ) -> Tuple[List[Dict], List[Dict], List[Dict]]:
+        """Split dictionary-format dataset."""
+        train_set = self._shuffle_if_needed(dataset["train"].copy(), config)
 
-        test_set = []
-        if "test" in dataset.keys():
-            test_set = dataset["test"]
-        elif "validation" in dataset.keys():
-            test_set = dataset["validation"]
-        elif "valid" in dataset.keys():
-            test_set = dataset["valid"]
+        # Find test set from available keys
+        test_set = next(
+            (
+                dataset[key].copy()
+                for key in ["test", "validation", "valid"]
+                if key in dataset
+            ),
+            [],
+        )
 
-        if base_shuffle and seed is not None:
-            if seed is not None:
-                print(f"shuffle dataset seed {seed}")
-                random.seed(seed)
-            random.shuffle(train_set)
-
-        eval_set = train_set[-eval_size:]
-        if train_size is not None:
-            train_set = train_set[:train_size]
-        test_set = test_set[:test_size]
-        return train_set, eval_set, test_set
-
-    def split_list_dataset(
-        self,
-        dataset,
-        train_size=None,
-        eval_size=0,
-        test_size=0,
-        seed=None,
-        base_shuffle=True,
-    ):
-        if base_shuffle and seed is not None:
-            if seed is not None:
-                print(f"shuffle dataset seed {seed}")
-                random.seed(seed)
-            random.shuffle(dataset)
-
-        test_set = dataset[:test_size]
-        dataset = dataset[test_size:]
-
-        if train_size is not None:
-            train_set = dataset[:train_size]
-        else:
-            train_set = dataset
-        eval_set = dataset[-eval_size:]
+        # Create splits
+        eval_set = train_set[-config.eval_size :] if config.eval_size > 0 else []
+        train_set = (
+            train_set[: config.train_size]
+            if config.train_size is not None
+            else train_set
+        )
+        test_set = test_set[: config.test_size] if config.test_size > 0 else []
 
         return train_set, eval_set, test_set
 
-    def _load_json_file(self, data_dir: str) -> dict:
-        if not (os.path.exists(data_dir) and data_dir.endswith(".json")):
-            raise ValueError(f"json file {data_dir} does not exist.")
+    def _split_list_dataset(
+        self, dataset: List[Dict], config: SplitConfig
+    ) -> Tuple[List[Dict], List[Dict], List[Dict]]:
+        """Split list-format dataset."""
+        dataset_copy = self._shuffle_if_needed(dataset.copy(), config)
 
-        with open(data_dir, "r") as file:
-            data = json.load(file)
-        return data
+        # Split sequentially
+        test_set = dataset_copy[: config.test_size]
+        remaining = dataset_copy[config.test_size :]
 
-    def build_task_dataset(self, dataset, TaskDataset):
+        train_set = (
+            remaining[: config.train_size]
+            if config.train_size is not None
+            else remaining
+        )
+        eval_set = remaining[-config.eval_size :] if config.eval_size > 0 else []
+
+        return train_set, eval_set, test_set
+
+    def _load_json_file(self, data_dir: str) -> Dict:
+        """Load JSON file with compact error handling."""
+        if (
+            not data_dir
+            or not os.path.exists(data_dir)
+            or not data_dir.endswith(".json")
+        ):
+            raise ValueError(f"Invalid JSON file path: {data_dir}")
+
+        try:
+            with open(data_dir, "r", encoding="utf-8") as file:
+                return json.load(file)
+        except (json.JSONDecodeError, IOError) as e:
+            raise ValueError(f"Error loading JSON file {data_dir}: {e}")
+
+    def build_task_dataset(self, dataset: List[Dict], TaskDataset: type) -> Dataset:
+        """Build task dataset using specified Dataset class."""
         return TaskDataset(dataset=dataset)
 
     def get_dataloader(
         self, split: str, batch_size: int, shuffle: bool = False
     ) -> DataLoader:
-        if self.TaskDataset is None:
-            self.TaskDataset = BaseDataset
+        """Get DataLoader for specified split with validation."""
+        if split not in self.dataset:
+            raise ValueError(
+                f"Invalid split '{split}'. Available: {list(self.dataset.keys())}"
+            )
 
-        assert split in self.dataset.keys(), f"Dataset split {split} does not exist."
-
-        dataset = self.build_task_dataset(
-            self.dataset[split], TaskDataset=self.TaskDataset
-        )
-
+        dataset = self.build_task_dataset(self.dataset[split], self.TaskDataset)
         return DataLoader(dataset, batch_size=batch_size, shuffle=shuffle)
 
     def get_dataset_size(self, split: str = "test") -> int:
+        """Get size of specified dataset split."""
+        if split not in self.dataset:
+            raise ValueError(
+                f"Invalid split '{split}'. Available: {list(self.dataset.keys())}"
+            )
         return len(self.dataset[split])
 
-    def process_gradient_descent_output(self, gradient_descent_output):
+    def process_gradient_descent_output(self, gradient_descent_output: Any) -> Any:
+        """Process gradient descent output (override in subclasses if needed)."""
         return gradient_descent_output

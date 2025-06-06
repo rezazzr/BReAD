@@ -1,6 +1,6 @@
 # define task prompts for various datasets
 import re
-from datasets import load_dataset
+
 from .base_task import BaseTask
 
 
@@ -9,7 +9,7 @@ class CustomTask(BaseTask):
         self,
         train_size,
         eval_size,
-        test_size=None,
+        test_size=0,
         task_name="epistemic",
         task_description="task from bigbench",
         data_dir="",

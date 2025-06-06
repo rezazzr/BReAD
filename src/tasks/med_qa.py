@@ -112,5 +112,3 @@ class CustomTask(BaseTask):
         if answer is None:
             return "N/A: Format error"
         return answer[0].upper()
-            return "N/A: Format error"
-        return answer[0].upper()

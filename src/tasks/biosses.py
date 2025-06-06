@@ -70,5 +70,3 @@ class CustomTask(BaseTask):
             return self.option_dict[match[-1]]
 
         return "N/A: format error."
-
-        return "N/A: format error."

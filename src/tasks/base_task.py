@@ -84,12 +84,12 @@ class BaseTask:
             test_size=test_size,
             base_shuffle=True,
         )
-        self.train_size = self.dataset["train"]
-        self.eval_size = self.dataset["eval"]
-        self.test_size = self.dataset["test"]
-        print(f"train_size set: {len(self.train_size)}")
-        print(f"eval_size set: {len(self.eval_size)}")
-        print(f"test_size set: {len(self.test_size)}")
+        self.train_size = len(self.dataset["train"])
+        self.eval_size = len(self.dataset["eval"])
+        self.test_size = len(self.dataset["test"])
+        print(f"train_size set: {self.train_size}")
+        print(f"eval_size set: {self.eval_size}")
+        print(f"test_size set: {self.test_size}")
 
         self.answer_format_prompt = "At the end show the answer option bracketed between <answer> and </answer>."
         """
@@ -157,7 +157,7 @@ class BaseTask:
                     comparisons.append(1)
                 else:
                     comparisons.append(0)
-            return comparisons  # I think this is a bug and should be outside the loop
+            return comparisons
         else:
             return list(np.array((np.array(preds) == np.array(labels))).astype(int))
 

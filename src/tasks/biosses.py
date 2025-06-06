@@ -1,6 +1,8 @@
 # define task prompts for various datasets
 import re
-from datasets import load_dataset
+
+from datasets import DatasetDict, load_dataset
+
 from .base_task import BaseTask
 
 
@@ -9,7 +11,7 @@ class CustomTask(BaseTask):
         self,
         train_size,
         eval_size,
-        test_size=None,
+        test_size=0,
         task_name="biosses",
         task_discription="",
         seed=None,
@@ -41,7 +43,9 @@ class CustomTask(BaseTask):
         dataset = load_dataset("biosses")
         question_format = "Sentence1: {sentence1}\nSentence2: {sentence2}\nOptions:\n(A) not similar\n(B) somewhat similar\n(C) similar"
         new_dataset = []
+        assert isinstance(dataset, DatasetDict), "Dataset should be a DatasetDict."
         for example in dataset["train"]:
+            assert isinstance(example, dict), "Each example should be a dictionary."
             question_str = question_format.format(
                 sentence1=example["sentence1"],
                 sentence2=example["sentence2"],
@@ -64,5 +68,7 @@ class CustomTask(BaseTask):
         match = re.findall(clean_pattern, response.lower())
         if len(match) != 0:
             return self.option_dict[match[-1]]
+
+        return "N/A: format error."
 
         return "N/A: format error."

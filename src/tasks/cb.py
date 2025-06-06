@@ -1,6 +1,8 @@
 # define task prompts for various datasets
 import re
+
 from datasets import load_dataset
+
 from .base_task import BaseTask
 
 
@@ -9,7 +11,7 @@ class CustomTask(BaseTask):
         self,
         train_size,
         eval_size,
-        test_size=None,
+        test_size=0,
         task_name="cb",
         task_discription="",
         seed=None,
@@ -33,7 +35,9 @@ class CustomTask(BaseTask):
         answer_dict = {0: "entailment", 1: "contradiction", 2: "neutral"}
         question_format = "Premise: {premise}\nHypothesis: {hypothesis}\nThat is the relationship between the preceding premise and the hypothesis?\nOptions:\n- Contradiction\n- Neutral\n- Entailment"
         new_dataset = dict(train=[], test=[])
+        assert isinstance(dataset, dict), "Dataset should be a dictionary."
         for example in dataset["train"]:
+            assert isinstance(example, dict), "Each example should be a dictionary."
             question_str = question_format.format(
                 premise=example["premise"],
                 hypothesis=example["hypothesis"],
@@ -42,6 +46,7 @@ class CustomTask(BaseTask):
                 dict(question=question_str, answer=answer_dict[example["label"]])
             )
         for example in dataset["validation"]:
+            assert isinstance(example, dict), "Each example should be a dictionary."
             question_str = question_format.format(
                 premise=example["premise"],
                 hypothesis=example["hypothesis"],
@@ -60,5 +65,7 @@ class CustomTask(BaseTask):
         match = re.findall(clean_pattern, response.lower())
         if len(match) != 0:
             return match[-1]
+
+        return "N/A: format error."
 
         return "N/A: format error."

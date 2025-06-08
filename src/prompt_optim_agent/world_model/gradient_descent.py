@@ -21,7 +21,12 @@ from .prompts.gradient_descent_prompts import (
     optimize_prompt_tempelate_single,
     summarization_prompt_tempelate,
 )
-from .prompts.log_prompt_templates import *
+from .prompts.log_prompt_templates import (
+    forward_log_tempelate,
+    gradient_log_tempelate,
+    gradient_summary_template,
+    optimize_log_tempelate,
+)
 
 
 class GradientDescent:

@@ -1,4 +1,5 @@
 import time
+from typing import Dict, Tuple
 
 from joblib import Parallel, delayed
 from openai import OpenAI
@@ -39,31 +40,75 @@ class OpenAIModel(BaseLanguageModel):
             print(f"Init openai client error: \n{e}")
             raise RuntimeError("Failed to initialize OpenAI client") from e
 
+        self.max_parallel_requests = kwargs.get("max_parallel_requests", 4)
+
     def batch_forward_func(self, batch_prompts):
-        """Process prompts in parallel using joblib."""
-        n_jobs = min(8, len(batch_prompts))  # Adjust as needed
-        return Parallel(n_jobs=n_jobs)(
-            delayed(self.generate)(prompt) for prompt in batch_prompts
+        """
+        Process a batch of prompts and return responses and aggregated logging info.
+        Returns:
+            Tuple[List[str], Dict[str, int]]
+        """
+
+        def process_batch():
+            results = Parallel(
+                n_jobs=min(self.max_parallel_requests, len(batch_prompts))
+            )(delayed(self.generate)(prompt) for prompt in batch_prompts)
+            return results
+
+        results, batch_latency = self.timed_call(process_batch)
+        responses = [result_tuple[0] for result_tuple in results]  # type: ignore
+        # Aggregate logging info
+        total_prompt_tokens = sum(
+            result_tuple[1]["prompt_tokens"] for result_tuple in results  # type: ignore
         )
+        total_generated_tokens = sum(
+            result_tuple[1]["generated_tokens"] for result_tuple in results  # type: ignore
+        )
+        total_tokens = sum(
+            result_tuple[1]["total_tokens"] for result_tuple in results  # type: ignore
+        )
+        logging_dict = {
+            "generated_tokens": total_generated_tokens,
+            "prompt_tokens": total_prompt_tokens,
+            "total_tokens": total_tokens,
+            "latency": batch_latency,
+        }
+        return responses, logging_dict
 
-    def generate(self, input):
-
+    def generate(self, input: str) -> Tuple[str, Dict[str, int]]:
+        """
+        Generate a response for a single input prompt.
+        Returns:
+            Tuple[str, Dict[str, int]]
+        """
         messages = [
             ChatCompletionUserMessageParam(role="user", content=input),
         ]
         backoff_time = 1
         while True:
             try:
-                return (
-                    self.model.chat.completions.create(
+
+                def call_openai():
+                    return self.model.chat.completions.create(
                         messages=messages,
                         model=self.model_name,
                         temperature=self.temperature,
                         max_tokens=self.max_tokens,
                     )
-                    .choices[0]
-                    .message.content.strip()  # type: ignore
-                )
+
+                response, latency = self.timed_call(call_openai)
+                choice = response.choices[0]
+                content = choice.message.content.strip()  # type: ignore
+                usage = getattr(response, "usage", None)
+                if usage is None:
+                    raise RuntimeError("OpenAI response missing usage information.")
+                logging_dict = {
+                    "generated_tokens": usage.completion_tokens,
+                    "prompt_tokens": usage.prompt_tokens,
+                    "total_tokens": usage.total_tokens,
+                    "latency": latency,
+                }
+                return content, logging_dict
             except Exception as e:
                 print(e, f" Sleeping {backoff_time} seconds...")
                 time.sleep(backoff_time)

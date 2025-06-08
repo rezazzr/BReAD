@@ -1,3 +1,4 @@
+import time
 from abc import ABC, abstractmethod
 from typing import Dict, List, Tuple, Union
 
@@ -61,3 +62,14 @@ class BaseLanguageModel(ABC):
             Tuple containing the generated response and a dictionary of additional information such as token usage.
         """
         pass
+
+    def timed_call(self, func, *args, **kwargs):
+        """
+        Utility to time a function call.
+        Returns:
+            Tuple[result, latency]
+        """
+        start_time = time.time()
+        result = func(*args, **kwargs)
+        latency = time.time() - start_time
+        return result, latency

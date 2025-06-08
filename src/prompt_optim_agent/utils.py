@@ -1,12 +1,11 @@
-import os
 import logging
-from glob import glob
+import os
 from datetime import datetime
-import pytz
-import openai
+from glob import glob
 
-openai.log = logging.getLogger("openai")
-openai.log.setLevel(logging.ERROR)
+import pytz
+
+logging.getLogger("openai").setLevel(logging.ERROR)
 logging.getLogger("urllib3").setLevel(logging.ERROR)
 
 
@@ -36,7 +35,9 @@ def get_pacific_time():
     return pacific_time
 
 
-def create_logger(logging_dir, name, log_mode="train"):
+def create_logger(
+    logging_dir: str, name: str, log_mode: str = "train"
+) -> logging.Logger:
     """
     Create a logger that writes to a log file and stdout.
     """

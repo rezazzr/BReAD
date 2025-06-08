@@ -12,6 +12,7 @@ import numpy as np
 import wandb
 
 from src.prompt_optim_agent.utils import create_logger
+from src.prompt_optim_agent.world_model.world_model import WorldModel
 
 from .base_algo import Action, OptimNode, SearchAlgo, State
 
@@ -91,7 +92,7 @@ class MCTS(SearchAlgo, Generic[State, Action]):
     def __init__(
         self,
         task,
-        world_model,
+        world_model: WorldModel,
         # mcts arguments
         expand_width=3,
         w_exp: float = 2.5,
@@ -532,10 +533,14 @@ class MCTS(SearchAlgo, Generic[State, Action]):
             self.logger.info(f"path_reward : {path_rewards}")
             self.logger.info("---------------------------")
 
-        qs_rank = np.argsort([np.mean(row) for row in paths_qs])[::-1].tolist()
-        rewards_rank = np.argsort([np.mean(row) for row in paths_rewards])[
-            ::-1
-        ].tolist()
+        qs_rank = sorted(
+            range(len(paths_qs)), key=lambda i: np.mean(paths_qs[i]), reverse=True
+        )
+        rewards_rank = sorted(
+            range(len(paths_rewards)),
+            key=lambda i: np.mean(paths_rewards[i]),
+            reverse=True,
+        )
 
         best_q_path = paths_nodes[qs_rank[0]]
         best_reward_path = paths_nodes[rewards_rank[0]]
@@ -594,8 +599,8 @@ class MCTS(SearchAlgo, Generic[State, Action]):
 
         last_node_of_best_reward_path = best_reward_path[-1]
         # log everything to wandb
-        wandb.run.summary["test_accuracy"] = selected_node.test_metric
-        wandb.run.summary["last_node_test_accuracy"] = (
+        wandb.run.summary["test_accuracy"] = selected_node.test_metric  # type: ignore
+        wandb.run.summary["last_node_test_accuracy"] = (  # type: ignore
             last_node_of_best_reward_path.test_metric
         )
         # make a table and send all the path data to wandb

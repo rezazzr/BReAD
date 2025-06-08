@@ -21,7 +21,7 @@ class OptimNode:
     """
 
     node_id: float
-    parent: int
+    parent: Optional[int]
     prompt: str
     children_id: List[int] = field(default_factory=list)
     gradient: Optional[str] = None

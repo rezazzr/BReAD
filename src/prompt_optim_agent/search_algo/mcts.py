@@ -508,9 +508,6 @@ class MCTS(SearchAlgo, Generic[State, Action]):
 
             for node in path:
                 path_ids.append(node.id)
-
-            for id in path_ids:
-                node = self.nodes[id]
                 uct = self._uct(node)
                 node.uct = uct
                 path_ucts.append(uct)

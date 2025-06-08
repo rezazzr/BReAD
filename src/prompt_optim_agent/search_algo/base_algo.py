@@ -82,6 +82,8 @@ class SearchAlgo(ABC):
         return self.states
 
     def process_all_correct_batch(self):
-        self.logger.info(f"\n-----------------------------------------------------")
+        if self.logger is None:
+            return
+        self.logger.info("\n-----------------------------------------------------")
         self.logger.info("all correct: skip updating cur_prompt")
-        self.logger.info(f"\n-----------------------------------------------------\n")
+        self.logger.info("\n-----------------------------------------------------\n")

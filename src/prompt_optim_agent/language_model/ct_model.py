@@ -14,14 +14,13 @@ class CTranslateModel(BaseLanguageModel):
         model_path: str,
         # your downloaded ct model path, e.g. "./workspace/download_models/Mistral-7B-Instruct-v0.2_int8_float16"
         temperature: float = 0,
-        max_length: int = 512,
+        max_tokens: int = 512,
         device: Optional[str] = None,
         **kwargs
     ):
-        super().__init__(model_name, temperature, **kwargs)
+        super().__init__(model_name, temperature, max_tokens, **kwargs)
 
         self.device = device or self.get_default_device()
-        self.max_length = max_length
         self.tokenizer = transformers.AutoTokenizer.from_pretrained(
             model_name, **self.get_tokenizer_kwargs()
         )
@@ -35,7 +34,7 @@ class CTranslateModel(BaseLanguageModel):
         results = self.model.generate_batch(
             [tokens],
             sampling_temperature=self.temperature,
-            max_length=self.max_length,
+            max_length=self.max_tokens,
             include_prompt_in_result=False,
         )
         output = self.tokenizer.decode(results[0].sequences_ids[0])

@@ -7,9 +7,10 @@ import torch
 class BaseLanguageModel(ABC):
     """Base class for all language models."""
 
-    def __init__(self, model_name: str, temperature: float, **kwargs):
+    def __init__(self, model_name: str, temperature: float, max_tokens: int, **kwargs):
         self.model_name = model_name
         self.temperature = temperature
+        self.max_tokens = max_tokens
 
     @staticmethod
     def get_default_device() -> str:

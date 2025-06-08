@@ -1,5 +1,6 @@
 import time
 
+from joblib import Parallel, delayed
 from openai import OpenAI
 from openai.types.chat import ChatCompletionUserMessageParam
 
@@ -16,8 +17,15 @@ CHAT_COMPLETION_MODELS = [
 
 
 class OpenAIModel(BaseLanguageModel):
-    def __init__(self, model_name: str, api_key: str, temperature: float, **kwargs):
-        super().__init__(model_name, temperature, **kwargs)
+    def __init__(
+        self,
+        model_name: str,
+        api_key: str,
+        temperature: float,
+        max_tokens: int,
+        **kwargs,
+    ):
+        super().__init__(model_name, temperature, max_tokens, **kwargs)
 
         assert (
             model_name in CHAT_COMPLETION_MODELS
@@ -32,8 +40,11 @@ class OpenAIModel(BaseLanguageModel):
             raise RuntimeError("Failed to initialize OpenAI client") from e
 
     def batch_forward_func(self, batch_prompts):
-        """Use base class default implementation."""
-        return self.default_batch_forward_func(batch_prompts)
+        """Process prompts in parallel using joblib."""
+        n_jobs = min(8, len(batch_prompts))  # Adjust as needed
+        return Parallel(n_jobs=n_jobs)(
+            delayed(self.generate)(prompt) for prompt in batch_prompts
+        )
 
     def generate(self, input):
 
@@ -48,6 +59,7 @@ class OpenAIModel(BaseLanguageModel):
                         messages=messages,
                         model=self.model_name,
                         temperature=self.temperature,
+                        max_tokens=self.max_tokens,
                     )
                     .choices[0]
                     .message.content.strip()  # type: ignore

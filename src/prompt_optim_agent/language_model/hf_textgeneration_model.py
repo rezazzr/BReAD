@@ -10,10 +10,11 @@ class HFTextGenerationModel(BaseLanguageModel):
         self,
         model_name: str,
         temperature: float,
+        max_tokens,
         device: Optional[str] = None,
         **kwargs
     ):
-        super().__init__(model_name, temperature, **kwargs)
+        super().__init__(model_name, temperature, max_tokens, **kwargs)
 
         self.device = device or self.get_default_device()
         self.tokenizer = AutoTokenizer.from_pretrained(
@@ -31,7 +32,7 @@ class HFTextGenerationModel(BaseLanguageModel):
             **model_inputs,
             do_sample=self.should_sample,
             temperature=self.temperature,
-            max_new_tokens=1024,
+            max_new_tokens=self.max_tokens,
             repetition_penalty=1.2,
             return_dict_in_generate=True,
             output_scores=True
@@ -54,7 +55,7 @@ class HFTextGenerationModel(BaseLanguageModel):
             **model_inputs,
             do_sample=self.should_sample,
             temperature=self.temperature,
-            max_new_tokens=2048,
+            max_new_tokens=self.max_tokens,
             repetition_penalty=1.2,
             return_dict_in_generate=True,
             output_scores=True

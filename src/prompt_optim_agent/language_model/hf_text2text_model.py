@@ -10,10 +10,11 @@ class HFText2TextModel(BaseLanguageModel):
         self,
         model_name: str,
         temperature: float,
+        max_tokens: int,
         device: Optional[str] = None,
         **kwargs
     ):
-        super().__init__(model_name, temperature, **kwargs)
+        super().__init__(model_name, temperature, max_tokens, **kwargs)
 
         self.device = device or self.get_default_device()
         self.tokenizer = AutoTokenizer.from_pretrained(

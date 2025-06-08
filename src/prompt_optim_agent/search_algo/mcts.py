@@ -3,13 +3,15 @@
 
 import itertools
 import json
+import logging
 import os
 from copy import deepcopy
-from typing import Generic, List, Optional
+from typing import Generic, List, Optional, Tuple
 
 import numpy as np
-
 import wandb
+
+from src.prompt_optim_agent.utils import create_logger
 
 from .base_algo import Action, OptimNode, SearchAlgo, State
 
@@ -42,7 +44,7 @@ class MCTSNode(Generic[State, Action]):
         self.parent = parent
         self.is_terminal = False
 
-        self.children: "Optional[list[MCTSNode]]" = []
+        self.children: list[MCTSNode] = []
         self.cum_rewards: list[float] = []
         self.reward = 0.0
         self.test_metric = -1.0
@@ -98,7 +100,7 @@ class MCTS(SearchAlgo, Generic[State, Action]):
         iteration_num: int = 12,
         # log
         log=True,
-        logger=None,
+        logger: Optional[logging.Logger] = None,
         log_dir=None,
         **kwargs,
     ) -> None:
@@ -130,17 +132,22 @@ class MCTS(SearchAlgo, Generic[State, Action]):
         self.min_threshold = 0.0  # The root node's reward as a min threshold
 
         # output
-        self.log = log
-        self.logger = logger
-        self.log_dir = log_dir
+        self.log_dir = log_dir if log_dir is not None else os.getcwd()
+        self.logger = (
+            logger
+            if logger is not None
+            else create_logger(self.log_dir, "mcts", log_mode="train")
+        )
+
         self.k = 1  # top-k reward nodes
-        self.trace_in_each_iter: list[list[MCTSNode]] = None
+        self.trace_in_each_iter: list[list[MCTSNode]] = []
         self.root: Optional[MCTSNode] = None
         self.nodes: list[MCTSNode] = []
         self.optim_nodes = []
         self.optim_nodes_ids_only = []
         self.base_optim_node_id = -1
         self.num_gradient_accumulation = kwargs.get("num_gradient_accumulation", 1)
+        self.log = log
 
         self.log_vars()
 
@@ -188,7 +195,7 @@ class MCTS(SearchAlgo, Generic[State, Action]):
         )
 
     def _uct_select(self, node: MCTSNode) -> MCTSNode:
-        return max(node.children, key=self._uct)
+        return max(node.children or [], key=self._uct)
 
     def _select(self, node: MCTSNode) -> list[MCTSNode]:
         """
@@ -217,7 +224,7 @@ class MCTS(SearchAlgo, Generic[State, Action]):
             Generate new child nodes and calculate their temporary reward.
         """
         if self.log:
-            self.logger.info(f"Expanding:")
+            self.logger.info("Expanding:")
         if self.is_terminal_node(node):
             node.is_terminal = True
             return
@@ -298,7 +305,7 @@ class MCTS(SearchAlgo, Generic[State, Action]):
         """
 
         if self.log:
-            self.logger.info(f"Simulating:")
+            self.logger.info("Simulating:")
         node = path[-1]
 
         while True:
@@ -329,32 +336,31 @@ class MCTS(SearchAlgo, Generic[State, Action]):
             node.visited += 1
             path.append(node)
 
-    def _back_propagate(self, path: list[MCTSNode]):
+    def _back_propagate(self, path: list[MCTSNode]) -> List[float]:
         """
         Back Propagation: Update the cumulated rewards of each node in the path.
         """
-
         if self.log:
-            self.logger.info(f"Back propagating:")
+            self.logger.info("Back propagating:")
 
-        rewards = []
         cum_rewards = []
+        running_sum = 0.0
 
+        # Traverse from leaf to root
         for node in reversed(path):
-            rewards.append(node.reward)
-            cum_reward = self.cal_cum_reward(rewards[::-1])
-            cum_rewards.append(cum_reward)
-            node.cum_rewards.append(cum_reward)
+            running_sum += node.reward
+            cum_rewards.append(running_sum)
+            node.cum_rewards.append(running_sum)
             if self.log:
                 self.logger.info(
-                    f"node {node.id}: depth {node.depth}, \
-                new cum_reward: {node.cum_rewards[-1]:.4f}"
+                    f"node {node.id}: depth {node.depth}, new cum_reward: {node.cum_rewards[-1]:.4f}"
                 )
 
-        cum_rewards = cum_rewards[::-1]
+        # Reverse to match the original path order (root to leaf)
+        cum_rewards.reverse()
         return cum_rewards
 
-    def iterate(self, node: MCTSNode) -> list[MCTSNode]:
+    def iterate(self, node: MCTSNode) -> Tuple[list[MCTSNode], List[float]]:
         """
         MCTS iteration: Selection, Expansion, Simulation, Back-Propagation
         """
@@ -428,7 +434,7 @@ class MCTS(SearchAlgo, Generic[State, Action]):
                 self.logger.info(f"   {eval_type} metric: {node.test_metric:.4f}")
             else:
                 self.logger.info(f"   {eval_type} metric: {node.test_metric}")
-        self.logger.info(f"---------------------")
+        self.logger.info("---------------------")
         if eval:
             return eval_output["correct"]
         else:
@@ -479,10 +485,10 @@ class MCTS(SearchAlgo, Generic[State, Action]):
 
     def prepare_output(self):
         self.logger.info(
-            f"\n---------------------  all iteration paths ------------------------"
+            "\n---------------------  all iteration paths ------------------------"
         )
         self.log_paths(self.trace_in_each_iter)
-        self.logger.info(f"\n---------------------  all nodes ------------------------")
+        self.logger.info("\n---------------------  all nodes ------------------------")
         self.log_nodes(self.nodes)
 
         # prepare output
@@ -538,7 +544,7 @@ class MCTS(SearchAlgo, Generic[State, Action]):
         )[: self.k]
 
         if len(self.world_model.test_dataloader) != 0:
-            self.logger.info(f"\n----------------  test nodes ------------------")
+            self.logger.info("\n----------------  test nodes ------------------")
             test_nodes_set = set(best_q_path + best_reward_path + top_k_reward_nodes)
             detailed_metrics_columns = []
             detailed_metrics_values = []
@@ -568,15 +574,13 @@ class MCTS(SearchAlgo, Generic[State, Action]):
                         )
                     }
                 )
-            self.logger.info(
-                f"\n----------------  top_k_reward_nodes------------------"
-            )
+            self.logger.info("\n----------------  top_k_reward_nodes------------------")
             for node in top_k_reward_nodes:
                 self.eval_and_log_node(
                     node, eval=False, log_metric=True, eval_type="test"
                 )
 
-            self.logger.info(f"\n----------------  best_reward_path------------------")
+            self.logger.info("\n----------------  best_reward_path------------------")
             for node in best_reward_path:
                 self.eval_and_log_node(
                     node, eval=False, log_metric=True, eval_type="test"

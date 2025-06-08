@@ -57,7 +57,7 @@ class BaseAgent:
 
         """
         self.task_name = task_name
-        self.search_algo = search_algo
+        self.search_algo_name = search_algo
         self.print_log = print_log
         self.log_dir = log_dir
         self.init_prompt = init_prompt
@@ -75,7 +75,7 @@ class BaseAgent:
                 task_name + "_" + task_setting["data_dir"].split("/")[-1].split(".")[-2]
             )
 
-        exp_name = f'{get_pacific_time().strftime("%Y%m%d_%H%M%S")}-{task_name}-algo_{search_algo}'
+        exp_name = f'{get_pacific_time().strftime("%Y%m%d_%H%M%S")}-{task_name}-algo_{self.search_algo_name}'
 
         self.log_dir = os.path.join(log_dir, exp_name)
         self.logger = create_logger(self.log_dir, f"{exp_name}", log_mode="train")
@@ -90,7 +90,7 @@ class BaseAgent:
             **optim_model_setting
         )
 
-        self.world_model = get_world_model(search_algo)(
+        self.world_model = get_world_model(self.search_algo_name)(
             task=self.task,
             logger=self.logger,
             base_model=self.base_model,
@@ -98,7 +98,7 @@ class BaseAgent:
             **world_model_setting,
         )
 
-        self.search_algo = get_search_algo(search_algo)(
+        self.search_algo = get_search_algo(self.search_algo_name)(
             task=self.task,
             world_model=self.world_model,
             logger=self.logger,

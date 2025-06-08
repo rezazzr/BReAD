@@ -1,9 +1,7 @@
 from . import *
 from .world_model import WorldModel
-from .beam_world_model import BeamSearchWorldModel
 
 WORLD_MODELS = {
-    "beam_search": BeamSearchWorldModel,
     "mcts": WorldModel,
 }
 

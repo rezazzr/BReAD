@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from typing import Dict, List, Tuple
+from typing import Dict, List, Tuple, Union
 
 import torch
 
@@ -36,7 +36,7 @@ class BaseLanguageModel(ABC):
     @abstractmethod
     def batch_forward_func(
         self, batch_prompts: List[str]
-    ) -> Tuple[List[str], Dict[str, int]]:
+    ) -> Tuple[List[str], Dict[str, Union[int, float]]]:
         """
         Process a batch of prompts and return responses.
 
@@ -50,7 +50,7 @@ class BaseLanguageModel(ABC):
         pass
 
     @abstractmethod
-    def generate(self, input: str) -> Tuple[str, Dict[str, int]]:
+    def generate(self, input: str) -> Tuple[str, Dict[str, Union[int, float]]]:
         """
         Generate a response for a single input prompt.
 

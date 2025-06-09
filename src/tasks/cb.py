@@ -57,9 +57,6 @@ class CustomTask(BaseTask):
 
         return new_dataset
 
-    def transform_format(self, data):
-        return data
-
     def clean_response(self, response):
         clean_pattern = r"\b(entailment|contradiction|neutral)\b"
         match = re.findall(clean_pattern, response.lower())

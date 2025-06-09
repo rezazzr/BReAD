@@ -30,7 +30,7 @@ class CustomTask(BaseTask):
 
         self.answer_format_prompt = "\nA:"
 
-    def load_task_dataset(self, **kwargs):
+    def load_task_dataset(self, *args, **kwargs):
         dataset = load_dataset("super_glue", "cb")
         answer_dict = {0: "entailment", 1: "contradiction", 2: "neutral"}
         question_format = "Premise: {premise}\nHypothesis: {hypothesis}\nThat is the relationship between the preceding premise and the hypothesis?\nOptions:\n- Contradiction\n- Neutral\n- Entailment"

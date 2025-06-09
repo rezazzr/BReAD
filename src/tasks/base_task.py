@@ -233,12 +233,14 @@ class BaseTask:
         self, dataset: List[Dict], config: SplitConfig
     ) -> Tuple[List[Dict], List[Dict], List[Dict]]:
         """Split list-format dataset."""
-        dataset_copy = self._shuffle_if_needed(dataset.copy(), config)
+        # Extract test set first before any shuffling to ensure consistency
+        test_set = dataset[: config.test_size] if config.test_size > 0 else []
+        remaining = dataset[config.test_size :]
 
-        # Split sequentially
-        test_set = dataset_copy[: config.test_size]
-        remaining = dataset_copy[config.test_size :]
+        # Now shuffle only the remaining data (excluding test set)
+        remaining = self._shuffle_if_needed(remaining, config)
 
+        # Split the remaining data into train and eval
         train_set = (
             remaining[: config.train_size]
             if config.train_size is not None

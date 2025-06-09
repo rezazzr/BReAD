@@ -4,11 +4,11 @@ import numpy as np
 import wandb
 from tqdm import tqdm
 
-from src.prompt_optim_agent.language_model.base_model import BaseLanguageModel
-from src.tasks.base_task import BaseTask
+from prompt_optim_agent.language_model.base_model import BaseLanguageModel
+from tasks.base_task import BaseTask
 
 from ..search_algo.base_algo import Action, State
-from ..search_algo.mcts import MCTSNode
+from ..search_algo.mcts_tree_node import MCTSNode
 from .gradient_descent import *
 
 

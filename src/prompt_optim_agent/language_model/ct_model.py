@@ -1,4 +1,4 @@
-from typing import Optional
+from typing import Dict, List, Optional, Tuple, Union
 
 import ctranslate2
 import transformers
@@ -26,16 +26,52 @@ class CTranslateModel(BaseLanguageModel):
         )
         self.model = ctranslate2.Generator(model_path, device=device)
 
-    def batch_forward_func(self, batch_prompts):
-        return self.default_batch_forward_func(batch_prompts)
+    def batch_forward_func(
+        self, batch_prompts
+    ) -> Tuple[List[str], Dict[str, Union[int, float]]]:
+        def process_batch():
+            results = []
+            for prompt in batch_prompts:
+                result = self.generate(prompt)
+                results.append(result)
+            return results
 
-    def generate(self, input):
-        tokens = self.tokenizer.convert_ids_to_tokens(self.tokenizer.encode(input))
-        results = self.model.generate_batch(
-            [tokens],
-            sampling_temperature=self.temperature,
-            max_length=self.max_tokens,
-            include_prompt_in_result=False,
+        results, batch_latency = self.timed_call(process_batch)
+        responses = [result_tuple[0] for result_tuple in results]
+        # Aggregate logging info
+        total_prompt_tokens = sum(
+            result_tuple[1]["prompt_tokens"] for result_tuple in results
         )
-        output = self.tokenizer.decode(results[0].sequences_ids[0])
-        return output
+        total_generated_tokens = sum(
+            result_tuple[1]["generated_tokens"] for result_tuple in results
+        )
+        total_tokens = sum(result_tuple[1]["total_tokens"] for result_tuple in results)
+        logging_dict = {
+            "generated_tokens": total_generated_tokens,
+            "prompt_tokens": total_prompt_tokens,
+            "total_tokens": total_tokens,
+            "latency": batch_latency,
+        }
+        return responses, logging_dict
+
+    def generate(self, input) -> Tuple[str, Dict[str, Union[int, float]]]:
+        def call_model():
+            tokens = self.tokenizer.convert_ids_to_tokens(self.tokenizer.encode(input))
+            results = self.model.generate_batch(
+                [tokens],
+                sampling_temperature=self.temperature,
+                max_length=self.max_tokens,
+                include_prompt_in_result=False,
+            )
+            output = self.tokenizer.decode(results[0].sequences_ids[0])
+            return output, tokens, results[0].sequences_ids[0]
+
+        (output, input_tokens, output_tokens), latency = self.timed_call(call_model)
+
+        logging_dict = {
+            "generated_tokens": len(output_tokens),
+            "prompt_tokens": len(input_tokens),
+            "total_tokens": len(input_tokens) + len(output_tokens),
+            "latency": latency,
+        }
+        return output, logging_dict

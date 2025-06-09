@@ -39,7 +39,7 @@ class CustomTask(BaseTask):
         else:
             return "C"
 
-    def load_task_dataset(self, **kwargs):
+    def load_task_dataset(self, *args, **kwargs):
         dataset = load_dataset("biosses")
         question_format = "Sentence1: {sentence1}\nSentence2: {sentence2}\nOptions:\n(A) not similar\n(B) somewhat similar\n(C) similar"
         new_dataset = []
@@ -55,9 +55,6 @@ class CustomTask(BaseTask):
             )
 
         return new_dataset
-
-    def transform_format(self, data):
-        return data
 
     def clean_response(self, response):
         clean_pattern = r"\((A|B|C)\)"

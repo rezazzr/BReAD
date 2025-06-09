@@ -51,7 +51,8 @@ class OpenAIModel(BaseLanguageModel):
 
         def process_batch():
             results = Parallel(
-                n_jobs=min(self.max_parallel_requests, len(batch_prompts))
+                n_jobs=min(self.max_parallel_requests, len(batch_prompts)),
+                backend="threading",
             )(delayed(self.generate)(prompt) for prompt in batch_prompts)
             return results
 

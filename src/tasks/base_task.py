@@ -109,7 +109,7 @@ class BaseTask:
         return (
             [1 if pred == label else 0 for pred, label in zip(preds, labels)]
             if data_type == "set"
-            else list(np.equal(preds, labels).astype(int))
+            else np.equal(preds, labels).astype(int).tolist()  # type: ignore
         )
 
     def cal_metric(self, preds: List[Any], labels: List[Any], **kwargs) -> float:

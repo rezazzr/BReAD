@@ -15,9 +15,6 @@ Large-language-model prompts shouldn’t go stale every time the underlying mode
 3. **Continual Prompt Optimization (CPO)**
    Drop-in utilities adapt an expert prompt tuned on, say, `gpt-3.5-turbo` to the shiny new `gpt-4o` (or any other API model) **without hose-pipe re-tuning**. Migration convergence is 6–8 % faster in our BBH benchmarks.
 
-Below are two **Markdown** tables you can paste straight into `README.md`.
-They reproduce the numbers and significance markers from the LaTeX originals while keeping everything GitHub-friendly.
-
 ---
 
 ### 1 · Prompt-optimization results  *(model: `gpt-3.5-turbo`)*

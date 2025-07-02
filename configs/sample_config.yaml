@@ -1,0 +1,79 @@
+###############################################################################
+#  B A S I C   S E T T I N G S
+###############################################################################
+task_name:                # (str)  filename in src/tasks/, e.g. cb | bigbench
+search_algo:              # mcts | beam_search (beam_search is not implemented yet)
+print_log:                # true | false
+log_dir:                  # directory for log files
+init_prompt:              # starting system prompt ("" begins from scratch)
+
+###############################################################################
+#  T A S K   S P L I T S   &   D A T A
+###############################################################################
+task_setting:
+  train_size:             # (int | null) examples used for optimisation
+  eval_size:              # (int)   held-out batch for reward
+  test_size:              # (int)   final evaluation size (0 = skip)
+  seed:                   # (int)   dataset shuffle seed
+  data_dir:               # (str | null) path to custom dataset file
+  post_instruction:       # false = [PROMPT][QUESTION], true = [QUESTION][PROMPT]
+
+###############################################################################
+#  B A S E   M O D E L   (answers questions)
+###############################################################################
+base_model_setting:
+  model_type:             # openai | hf_text2text | hf_textgeneration | ct_model
+  model_name:             # model id (OpenAI, HF repo, or local dir)
+  temperature:            # 0.0-1.0   → reproducibility vs diversity
+  max_tokens:             # generation cut-off
+  api_key:                # required for API models; env-vars allowed
+  device:                 # cuda | cpu | cuda:0 …  (null = auto)
+  model_path:             # local path for ct_model binaries
+  max_parallel_requests:  # OpenAI threading
+
+###############################################################################
+#  O P T I M I S E R   M O D E L   (critiques & rewrites prompts)
+###############################################################################
+optim_model_setting:
+  model_type:
+  model_name:
+  temperature:
+  max_tokens:
+  api_key:
+  device:
+  model_path:
+  max_parallel_requests:
+
+###############################################################################
+#  S E A R C H   A L G O R I T H M
+###############################################################################
+search_setting:
+  iteration_num:          # number of MCTS (or beam) iterations
+  expand_width:           # children generated per expansion
+  depth_limit:            # max tree depth
+  # -- MCTS only --
+  min_depth:              # depth before early-stop may fire
+  w_exp:                  # UCT exploration weight
+  # -- Beam only --
+  beam_width:
+
+###############################################################################
+#  W O R L D   M O D E L   (gradient-descent engine)
+###############################################################################
+world_model_setting:
+  train_shuffle:          # true = reshuffle every epoch
+  num_new_prompts:        # prompts generated per gradient step
+  train_batch_size:
+  eval_batch_size:
+  test_batch_size:
+  positive_reinforcement_depth:   # depth < n → ignore positive gradients
+  gradient_sampling:      # >1 = aggregate multiple feedback samples
+
+###############################################################################
+#  W e i g h t s   &   B i a s e s   (optional; delete block to disable)
+###############################################################################
+wandb:
+  project:
+  group:
+  tags:                   # ["cb", "experiment-x", …]
+  name:                   # run name gets a timestamp suffix automatically
